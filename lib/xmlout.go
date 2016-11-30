@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 )
@@ -14,8 +15,8 @@ const (
 
 	// XUnitTemplate is XML template for xunit style reporting
 	XUnitTemplate string = `
-{{range $suite := .Suites}}  <testsuite name="{{.Name}}" tests="{{.Len}}" errors="0" failures="{{.NumFailed}}" skip="{{.NumSkipped}}">
-{{range  $test := $suite.Tests}}    <testcase classname="{{$suite.Name}}" name="{{$test.Name}}" time="{{$test.Time}}">
+{{range $suite := .Suites}}  <testsuite name="{{.Name|clean}}" tests="{{.Len}}" errors="0" failures="{{.NumFailed}}" skip="{{.NumSkipped}}">
+{{range  $test := $suite.Tests}}    <testcase classname="{{$suite.Name|clean}}" name="{{$test.Name|clean}}" time="{{$test.Time}}">
 {{if eq $test.Status $.Skipped }}      <skipped/> {{end}}
 {{if eq $test.Status $.Failed }}      <failure type="go.error" message="error">
         <![CDATA[{{$test.Message}}]]>
@@ -42,15 +43,15 @@ const (
           environment="n/a"
           test-framework="golang">
 {{range $suite := .Suites}}
-    <class time="{{.Time}}" name="{{.Name}}"
+    <class time="{{.Time}}" name="{{.Name|clean}}"
   	     total="{{.Len}}"
   	     passed="{{.NumPassed}}"
   	     failed="{{.NumFailed}}"
   	     skipped="{{.NumSkipped}}">
 {{range  $test := $suite.Tests}}
-        <test name="{{$test.Name}}"
+        <test name="{{$test.Name|clean}}"
           type="test"
-          method="{{$test.Name}}"
+          method="{{$test.Name|clean}}"
           result={{if eq $test.Status $.Skipped }}"Skip"{{else if eq $test.Status $.Failed }}"Fail"{{else if eq $test.Status $.Passed }}"Pass"{{end}}
           time="{{$test.Time}}">
         {{if eq $test.Status $.Failed }}  <failure exception-type="go.error">
@@ -108,7 +109,9 @@ func WriteXML(suites []*Suite, out io.Writer, xmlTemplate string, testTime time.
 		Failed:   Failed,
 	}
 	testsResult.calcTotals()
-	t := template.New("test template")
+	t := template.New("test template").Funcs(template.FuncMap{
+		"clean": func(s string) string { return strings.Replace(s, "/", ".", -1) },
+	})
 
 	t, err := t.Parse(xmlDeclaration + xmlTemplate)
 	if err != nil {
